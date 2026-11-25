@@ -180,7 +180,10 @@ play_events <- function(pbp) {
     mutate(points = value * unname(PLAY_W[stat]))
 }
 
-pbp <- load_pbp(SEASON) %>% select(any_of(PBP_COLS))
+pbp <- readr::read_csv(
+  sprintf("https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_%d.csv.gz", SEASON),
+  col_select = any_of(PBP_COLS), guess_max = 100000, show_col_types = FALSE
+)
 
 # Names and positions come from the weekly stats so play-level rows use the
 # same display names and the same position filter as the rest of the app.
