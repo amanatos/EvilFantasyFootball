@@ -1,0 +1,280 @@
+---
+title: "League Scoring from Play-by-Play"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: paged
+params:
+  pbp_file: "pbp9925.csv"
+  include_kneels_spikes: true       # official box score counts kneels as rushes, spikes as incompletions
+  adjust_pa_for_return_tds: false   # true = subtract 6 per opponent return TD from points allowed
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(knitr)
+```
+
+Scoring is **lower = better**: yards, TDs and catches are negative; turnovers, sacks, misses and attempts are positive.
+Works on nflfastR-style play-by-play (1999+).
+
+# 1. Load data
+
+```{r load}
+pbp <- read_csv(params$pbp_file, guess_max = 100000, show_col_types = FALSE)
+
+# Plays that count: drop penalty-nullified plays; keep 2-pt tries separate
+valid <- pbp %>% filter(!is.na(play_type), play_type != "no_play")
+reg   <- valid %>% filter(is.na(two_point_attempt) | two_point_attempt == 0)
+twopt <- valid %>% filter(two_point_attempt == 1)
+
+# Standardize every player event to one row: who, where (game/quarter/half/play), what stat
+ev <- function(df, id, name, team, stat, value = 1) {
+  df %>% transmute(game_id, play_id, qtr, game_half, season, week, season_type,
+                   team = {{ team }}, player_id = {{ id }}, player_name = {{ name }},
+                   stat = stat, value = {{ value }}) %>%
+    filter(!is.na(player_id), !is.na(value))
+}
+```
+
+# 2. Player events
+
+## Passing, rushing, receiving
+
+```{r offense}
+pass_plays <- reg %>% filter(play_type %in% c("pass", "qb_spike"))
+py   <- pass_plays %>% filter(sack == 0 | is.na(sack)) %>% ev(passer_player_id, passer_player_name, posteam, "py", passing_yards)
+inc  <- pass_plays %>% filter(incomplete_pass == 1 | interception == 1) %>% ev(passer_player_id, passer_player_name, posteam, "inc")   # an INT also counts as an incompletion
+ptd  <- pass_plays %>% filter(pass_touchdown == 1)  %>% ev(passer_player_id, passer_player_name, posteam, "ptd")
+int  <- pass_plays %>% filter(interception == 1)    %>% ev(passer_player_id, passer_player_name, posteam, "int")
+sk   <- pass_plays %>% filter(sack == 1)            %>% ev(passer_player_id, passer_player_name, posteam, "sk")
+pc2  <- twopt %>% filter(two_point_conv_result == "success", play_type == "pass") %>% ev(passer_player_id, passer_player_name, posteam, "p2pc")
+
+rush_plays <- reg %>% filter(play_type == "run" | (params$include_kneels_spikes & play_type == "qb_kneel")) %>%
+  mutate(rid = coalesce(rusher_player_id, passer_player_id), rname = coalesce(rusher_player_name, passer_player_name))
+ry   <- rush_plays %>% ev(rid, rname, posteam, "ry", rushing_yards)
+ra   <- rush_plays %>% ev(rid, rname, posteam, "ra")
+rtd  <- rush_plays %>% filter(rush_touchdown == 1) %>% ev(rid, rname, posteam, "rtd")
+r2   <- twopt %>% filter(two_point_conv_result == "success", play_type == "run") %>% ev(rusher_player_id, rusher_player_name, posteam, "p2pr")
+
+tgt_plays <- pass_plays %>% filter(!is.na(receiver_player_id), sack == 0 | is.na(sack))
+ret  <- tgt_plays %>% ev(receiver_player_id, receiver_player_name, posteam, "ret")
+rec  <- tgt_plays %>% filter(complete_pass == 1)   %>% ev(receiver_player_id, receiver_player_name, posteam, "rec")
+rey  <- tgt_plays %>% filter(complete_pass == 1)   %>% ev(receiver_player_id, receiver_player_name, posteam, "rey", receiving_yards)
+retd <- tgt_plays %>% filter(pass_touchdown == 1)  %>% ev(receiver_player_id, receiver_player_name, posteam, "retd")
+re2  <- twopt %>% filter(two_point_conv_result == "success", play_type == "pass") %>% ev(receiver_player_id, receiver_player_name, posteam, "p2pre")
+```
+
+## Kicking and punting
+
+Missed FG distance buckets stack on top of the flat missed-FG penalty.
+
+```{r kicking}
+fgm <- valid %>% filter(field_goal_attempt == 1, field_goal_result %in% c("missed", "blocked")) %>%
+  mutate(dist = coalesce(kick_distance, yardline_100 + 17),
+         bucket = case_when(dist < 40 ~ "fgm0", dist < 50 ~ "fgm40", dist < 60 ~ "fgm50", TRUE ~ "fgm60"))
+fgm_flat <- fgm %>% ev(kicker_player_id, kicker_player_name, posteam, "fgm")
+fgm_bkt  <- fgm %>% transmute(game_id, play_id, qtr, game_half, season, week, season_type,
+                              team = posteam, player_id = kicker_player_id,
+                              player_name = kicker_player_name, stat = bucket, value = 1) %>%
+  filter(!is.na(player_id))
+patm <- valid %>% filter(extra_point_attempt == 1, extra_point_result %in% c("failed", "blocked")) %>%
+  ev(kicker_player_id, kicker_player_name, posteam, "patm")
+ptb  <- valid %>% filter(punt_blocked == 1) %>% ev(punter_player_id, punter_player_name, posteam, "ptb")
+```
+
+## Fumbles and return TDs
+
+```{r misc}
+fum_long <- bind_rows(
+  valid %>% filter(!is.na(fumbled_1_player_id)) %>%
+    transmute(game_id, play_id, qtr, game_half, season, week, season_type,
+              team = fumbled_1_team, player_id = fumbled_1_player_id, player_name = fumbled_1_player_name,
+              lost = (!is.na(fumble_recovery_1_team) & fumble_recovery_1_team != fumbled_1_team) |
+                     (fumble_lost == 1 & is.na(fumbled_2_player_id))),
+  valid %>% filter(!is.na(fumbled_2_player_id)) %>%
+    transmute(game_id, play_id, qtr, game_half, season, week, season_type,
+              team = fumbled_2_team, player_id = fumbled_2_player_id, player_name = fumbled_2_player_name,
+              lost = !is.na(fumble_recovery_2_team) & fumble_recovery_2_team != fumbled_2_team))
+fum  <- fum_long %>% mutate(stat = "fum",  value = 1)
+fuml <- fum_long %>% filter(lost) %>% mutate(stat = "fuml", value = 1)
+
+# Classify every return TD once (used for players AND teams)
+ret_td <- valid %>% filter(return_touchdown == 1) %>%
+  mutate(td_type = case_when(
+    kickoff_attempt == 1 ~ "krtd",
+    punt_attempt == 1 & punt_blocked == 1 ~ "blkkrtd",
+    punt_attempt == 1 ~ "prtd",
+    field_goal_attempt == 1 | extra_point_attempt == 1 ~ "blkkrtd",
+    interception == 1 ~ "inttd",
+    fumble == 1 & td_team == posteam ~ "ftd",
+    fumble == 1 ~ "frtd",
+    TRUE ~ NA_character_)) %>% filter(!is.na(td_type))
+ret_td_p <- ret_td %>% transmute(game_id, play_id, qtr, game_half, season, week, season_type,
+                                 team = td_team, player_id = td_player_id, player_name = td_player_name,
+                                 stat = td_type, value = 1) %>%
+  filter(!is.na(player_id))
+```
+
+# 3. Player scoring
+
+```{r player-scoring}
+player_w <- c(py = -0.04, inc = 1, ptd = -4, int = 10, sk = 2, p2pc = -1,
+              ry = -0.25, ra = 1, rtd = -2, p2pr = -1,
+              rey = -0.05, rec = -3, retd = -2, p2pre = -1, ret = 3,
+              patm = 5, fgm = 1, fgm0 = 10, fgm40 = 10, fgm50 = 5, fgm60 = 3,
+              ptb = 25,
+              fum = 5, fuml = 10, krtd = -6, prtd = -6, ftd = -6, inttd = -6, frtd = -6, blkkrtd = -6)
+
+# Long format: one row per player per play per stat
+player_long <- bind_rows(py, inc, ptd, int, sk, pc2, ry, ra, rtd, r2, ret, rec, rey, retd, re2,
+                         fgm_flat, fgm_bkt, patm, ptb, fum, fuml, ret_td_p) %>%
+  select(game_id, play_id, qtr, game_half, season, week, season_type, team, player_id, player_name, stat, value) %>%
+  mutate(points = value * unname(player_w[stat]))
+stopifnot(!anyNA(player_long$points))
+
+score <- function(df, w) {
+  for (s in setdiff(names(w), names(df))) df[[s]] <- 0   # stat never occurred -> 0
+  df$points <- as.numeric(as.matrix(df[, names(w)]) %*% w)
+  df
+}
+
+# Wide format: one row per player per game
+player_game_scores <- player_long %>%
+  group_by(game_id, season, week, season_type, player_id, stat) %>%
+  summarise(team = first(team), player_name = first(player_name), value = sum(value), .groups = "drop") %>%
+  pivot_wider(names_from = stat, values_from = value, values_fill = 0) %>%
+  score(player_w)
+
+player_game_scores %>% select(player_name, team, week, points) %>% arrange(desc(points)) %>% head(10) %>% kable(digits = 2, caption = "Worst 10 individual games")
+
+#these stats are a little off
+```
+
+# 4. Team scoring (D/ST + team loss)
+
+```{r team-scoring}
+games <- valid %>% distinct(game_id, season, week, season_type, home_team, away_team, home_score, away_score)
+team_games <- bind_rows(
+  games %>% transmute(game_id, season, week, season_type, team = home_team, opp = away_team, pf = home_score, pa_raw = away_score),
+  games %>% transmute(game_id, season, week, season_type, team = away_team, opp = home_team, pf = away_score, pa_raw = home_score))
+
+tev <- function(df, team, stat, value = 1) df %>% transmute(game_id, team = {{ team }}, stat = stat, value = {{ value }}) %>% filter(!is.na(team))
+
+fr <- bind_rows(
+  valid %>% filter(!is.na(fumble_recovery_1_team), !is.na(fumbled_1_team), fumble_recovery_1_team != fumbled_1_team) %>% tev(fumble_recovery_1_team, "d_fr"),
+  valid %>% filter(!is.na(fumble_recovery_2_team), !is.na(fumbled_2_team), fumble_recovery_2_team != fumbled_2_team) %>% tev(fumble_recovery_2_team, "d_fr"))
+
+team_events <- bind_rows(
+  reg   %>% filter(sack == 1) %>% tev(defteam, "d_sk"),
+  reg   %>% filter(interception == 1) %>% tev(defteam, "d_int"),
+  fr,
+  ret_td %>% tev(td_team, paste0("d_", ret_td$td_type)) %>% filter(stat != "d_ftd"),   # FTD is an individual/offense stat
+  valid %>% filter(punt_blocked == 1 | field_goal_result == "blocked" | extra_point_result == "blocked") %>% tev(defteam, "d_blkk"),
+  pbp   %>% filter(safety == 1) %>% tev(defteam, "d_sf"),   # includes safeties from penalties (no_play rows)
+  valid %>% filter(extra_point_result == "safety" | two_point_conv_result == "safety") %>% tev(defteam, "d_1psf"),
+  valid %>% filter(defensive_two_point_conv == 1) %>% tev(defteam, "d_2ptret")
+) %>% group_by(game_id, team, stat) %>% summarise(value = sum(value), .groups = "drop") %>%
+  pivot_wider(names_from = stat, values_from = value, values_fill = 0)
+
+off_yards <- valid %>% filter(play_type %in% c("pass", "run", "qb_kneel", "qb_spike"),
+                              is.na(two_point_attempt) | two_point_attempt == 0) %>%
+  group_by(game_id, team = posteam) %>% summarise(off_yds = sum(yards_gained, na.rm = TRUE), .groups = "drop")
+
+opp_ret_tds <- ret_td %>% filter(td_type != "ftd") %>% count(game_id, scorer = td_team, name = "ret_tds")
+
+team_w <- c(d_sk = -1, d_int = -2, d_fr = -2, d_inttd = -6, d_frtd = -6, d_krtd = -6, d_prtd = -6, d_blkkrtd = -6,
+            d_blkk = -2, d_sf = -2, d_1psf = 1000, d_2ptret = -2)
+
+team_game_scores <- team_games %>%
+  left_join(team_events, by = c("game_id", "team")) %>%
+  left_join(off_yards %>% rename(opp = team, ya = off_yds), by = c("game_id", "opp")) %>%
+  left_join(opp_ret_tds %>% rename(opp = scorer, opp_ret_tds = ret_tds), by = c("game_id", "opp")) %>%
+  mutate(across(c(starts_with("d_"), opp_ret_tds), ~ replace_na(.x, 0)),
+         pa = pa_raw - if (params$adjust_pa_for_return_tds) 6 * opp_ret_tds else 0,
+         pa_pts = 0.25 * pa + case_when(pa == 0 ~ -5, pa <= 6 ~ -4, pa <= 13 ~ -3, pa <= 17 ~ -1, pa <= 27 ~ 0,
+                                        pa <= 34 ~ 1, pa <= 45 ~ 3, TRUE ~ 5),
+         ya_pts = case_when(ya < 100 ~ -5, ya < 200 ~ -3, ya < 300 ~ -2, ya < 350 ~ 0, ya < 400 ~ 1,
+                            ya < 450 ~ 3, ya < 500 ~ 5, ya < 550 ~ 6, TRUE ~ 7),
+         tl = as.integer(pf < pa_raw)) %>%   # ties = no loss
+  score(team_w) %>%
+  mutate(defst_points = points + pa_pts + ya_pts, tl_points = tl * 1, points = NULL)
+
+team_game_scores %>% group_by(team) %>% summarise(defst_points = sum(defst_points), losses = sum(tl)) %>%
+  arrange(desc(defst_points)) %>% head(5) %>% kable(digits = 2, caption = "Worst 5 D/STs for the season")
+```
+
+```{r write, eval=FALSE}
+# Not run by default. Set eval=TRUE (or run manually) to save CSVs next to the Rmd.
+#write_csv(player_game_scores, "player_game_scores_2025.csv")
+#write_csv(team_game_scores,   "team_game_scores_2025.csv")
+```
+
+# 5. Secondary analysis: highest-scoring play, quarter and half
+
+"Highest" here means the **most points**, which in this league is the **worst** performance. Individual players only (D/ST excluded).
+Quarter 5 / `Overtime` is overtime. Player-level team loss isn't included.
+
+```{r peaks-setup}
+# helper: stat-by-stat breakdown of one scoring window
+breakdown <- function(rows) {
+  rows %>% group_by(stat) %>% summarise(count_or_yards = sum(value), points = sum(points), .groups = "drop") %>%
+    arrange(desc(abs(points)))
+}
+```
+
+## Highest-scoring play
+
+```{r peak-play}
+play_scores <- player_long %>%
+  group_by(game_id, play_id, player_id) %>%
+  summarise(player_name = first(player_name), team = first(team), season = first(season), week = first(week), qtr = first(qtr),
+            points = sum(points), stats = paste(stat, collapse = ", "), .groups = "drop") %>%
+  left_join(pbp %>% select(game_id, play_id, desc), by = c("game_id", "play_id")) %>%
+  arrange(desc(points))
+
+# Blocked punts are a flat 25 for the punter, so several plays can tie for the top spot
+n_tied <- sum(play_scores$points == max(play_scores$points))
+cat(n_tied, "play(s) tied for the highest score\n")
+play_scores %>% head(max(5, n_tied)) %>% select(player_name, team, season, week, qtr, points, stats, desc) %>% kable(digits = 2)
+
+top_play <- play_scores[1, ]
+cat("\n**Worst single play:**", top_play$player_name, "-", top_play$points, "points\n\n", top_play$desc)
+player_long %>% filter(game_id == top_play$game_id, play_id == top_play$play_id, player_id == top_play$player_id) %>%
+  breakdown() %>% kable(digits = 2)
+```
+
+## Highest-scoring quarter
+
+```{r peak-quarter}
+qtr_scores <- player_long %>%
+  group_by(game_id, qtr, player_id) %>%
+  summarise(player_name = first(player_name), team = first(team), season = first(season), week = first(week), points = sum(points), .groups = "drop") %>%
+  arrange(desc(points))
+
+qtr_scores %>% head(5) %>% kable(digits = 2)
+
+top_q <- qtr_scores[1, ]
+player_long %>% filter(game_id == top_q$game_id, qtr == top_q$qtr, player_id == top_q$player_id) %>%
+  breakdown() %>% kable(digits = 2, caption = paste(top_q$player_name, "- Wk", top_q$week, "Q", top_q$qtr))
+```
+
+## Highest-scoring half
+
+```{r peak-half}
+half_scores <- player_long %>%
+  group_by(game_id, game_half, player_id) %>%
+  summarise(player_name = first(player_name), team = first(team), season = first(season), week = first(week), points = sum(points), .groups = "drop") %>%
+  arrange(desc(points))
+
+half_scores %>% head(5) %>% kable(digits = 2)
+
+top_h <- half_scores[1, ]
+player_long %>% filter(game_id == top_h$game_id, game_half == top_h$game_half, player_id == top_h$player_id) %>%
+  breakdown() %>% kable(digits = 2, caption = paste(top_h$player_name, "- Wk", top_h$week, top_h$game_half))
+```
+

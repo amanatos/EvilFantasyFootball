@@ -1,0 +1,340 @@
+---
+title: "NFL_Evil_Fantasy"
+format: html
+editor: visual
+---
+
+NFL Evil Fantasy Football History
+
+Setup
+
+```{r setup}
+library(tidyverse)
+library(ggplot2)
+library(nflreadr)
+```
+
+Data (Start 2025)
+
+```{r nfl_data_25}
+data25 <- nflreadr::load_player_stats(seasons = 2025)
+
+wins_losses_25 <- nflreadr::load_schedules(seasons = 2025) %>% 
+  select(game_id, home_team, result) %>% 
+  mutate(winloss = ifelse(result < 0, 1, 0))
+
+data25_full <- left_join(data25, wins_losses_25, by = "game_id") %>%
+  mutate(loss = ifelse((team == home_team & result < 0) | (team != home_team & result > 0), 1, 0)) 
+
+data25_full %>%
+  filter(position == "P", pt_blocked >0)
+
+```
+
+Let's Just do QBs First
+
+```{r data_25_qb}
+data25_qb <- data25_full %>% 
+  filter(position == "QB") %>% 
+  group_by(player_display_name, week) %>% 
+  summarise(evil_pts = 1*(attempts - completions) - 0.04*passing_yards - 4*passing_tds - passing_2pt_conversions + 10*passing_interceptions + 2*sacks_suffered + carries - 0.25*rushing_yards -2*rushing_tds - rushing_2pt_conversions + targets - receptions - 0.05*receiving_yards - 2*receiving_tds - receiving_2pt_conversions + 5*fumbles_total +10*fumbles_lost_total + fg_missed + 10*fg_missed_0_19 + 10*fg_missed_20_29 + 10*fg_missed_30_39 + 10*fg_missed_40_49 + 5*fg_missed_50_59 + 3*fg_missed_60_ + 5*pat_missed -6*pt_return_tds + loss + 25*pt_blocked) %>% 
+  arrange(desc(evil_pts))
+
+```
+
+All Positions 2026
+
+```{r data_2025_all}
+data25_all <- data25_full %>% 
+  filter(position == "QB") %>% 
+  group_by(player_display_name, week) %>% 
+  summarise(evil_pts = 1*(attempts - completions) - 0.04*passing_yards - 4*passing_tds - passing_2pt_conversions + 10*passing_interceptions + 2*sacks_suffered + carries - 0.25*rushing_yards -2*rushing_tds - rushing_2pt_conversions + targets - receptions - 0.05*receiving_yards - 2*receiving_tds - receiving_2pt_conversions + 5*fumbles_total +10*fumbles_lost_total + fg_missed + 10*fg_missed_0_19 + 10*fg_missed_20_29 + 10*fg_missed_30_39 + 10*fg_missed_40_49 + 5*fg_missed_50_59 + 3*fg_missed_60_ + 5*pat_missed -6*pt_return_tds + loss + 25*pt_blocked) %>% 
+  arrange(desc(evil_pts))
+```
+
+Lets do RBs
+
+```{r evilrb_25}
+evilrb25 <- data25_full %>% 
+  filter(position == "RB") %>% 
+  group_by(player_display_name, week) %>% 
+  summarise(evil_pts = 1*(attempts - completions) - 0.04*passing_yards - 4*passing_tds - passing_2pt_conversions + 10*passing_interceptions + 2*sacks_suffered + carries - 0.25*rushing_yards -2*rushing_tds - rushing_2pt_conversions + targets - receptions - 0.05*receiving_yards - 2*receiving_tds - receiving_2pt_conversions + 5*fumbles_total +10*fumbles_lost_total + fg_missed + 10*fg_missed_0_19 + 10*fg_missed_20_29 + 10*fg_missed_30_39 + 10*fg_missed_40_49 + 5*fg_missed_50_59 + 3*fg_missed_60_ + 5*pat_missed -6*pt_return_tds + loss + 25*pt_blocked) %>% 
+  arrange(desc(evil_pts))
+```
+
+Lets do WRs
+
+```{r evilwr25}
+evilwr25 <- data25_full %>% 
+  filter(position == "WR") %>% 
+  group_by(player_display_name, week) %>% 
+  summarise(evil_pts = 1*(attempts - completions) - 0.04*passing_yards - 4*passing_tds - passing_2pt_conversions + 10*passing_interceptions + 2*sacks_suffered + carries - 0.25*rushing_yards -2*rushing_tds - rushing_2pt_conversions + targets - receptions - 0.05*receiving_yards - 2*receiving_tds - receiving_2pt_conversions + 5*fumbles_total +10*fumbles_lost_total + fg_missed + 10*fg_missed_0_19 + 10*fg_missed_20_29 + 10*fg_missed_30_39 + 10*fg_missed_40_49 + 5*fg_missed_50_59 + 3*fg_missed_60_ + 5*pat_missed -6*pt_return_tds + loss + 25*pt_blocked) %>% 
+  arrange(desc(evil_pts))
+```
+
+Lets do TEs
+
+```{r evilte25}
+evilte25 <- data25_full %>% 
+  filter(position == "TE") %>% 
+  group_by(player_display_name, week) %>% 
+  summarise(evil_pts = 1*(attempts - completions) - 0.04*passing_yards - 4*passing_tds - passing_2pt_conversions + 10*passing_interceptions + 2*sacks_suffered + carries - 0.25*rushing_yards -2*rushing_tds - rushing_2pt_conversions + targets - receptions - 0.05*receiving_yards - 2*receiving_tds - receiving_2pt_conversions + 5*fumbles_total +10*fumbles_lost_total + fg_missed + 10*fg_missed_0_19 + 10*fg_missed_20_29 + 10*fg_missed_30_39 + 10*fg_missed_40_49 + 5*fg_missed_50_59 + 3*fg_missed_60_ + 5*pat_missed -6*pt_return_tds + loss + 25*pt_blocked) %>% 
+  arrange(desc(evil_pts))
+```
+
+Kickers
+
+```{r evilk25}
+evilk25 <- data25_full %>% 
+  filter(position == "K") %>% 
+  group_by(player_display_name, week) %>% 
+  summarise(evil_pts = 1*(attempts - completions) - 0.04*passing_yards - 4*passing_tds - passing_2pt_conversions + 10*passing_interceptions + 2*sacks_suffered + carries - 0.25*rushing_yards -2*rushing_tds - rushing_2pt_conversions + targets - receptions - 0.05*receiving_yards - 2*receiving_tds - receiving_2pt_conversions + 5*fumbles_total +10*fumbles_lost_total + fg_missed + 10*fg_missed_0_19 + 10*fg_missed_20_29 + 10*fg_missed_30_39 + 10*fg_missed_40_49 + 5*fg_missed_50_59 + 3*fg_missed_60_ + 5*pat_missed -6*pt_return_tds + loss + 25*pt_blocked) %>% 
+  arrange(desc(evil_pts))
+```
+
+Punters...
+
+```{r evilp25}
+evilp25 <- data25_full %>% 
+  filter(position == "P") %>% 
+  group_by(player_display_name, week) %>% 
+  summarise(evil_pts = 1*(attempts - completions) - 0.04*passing_yards - 4*passing_tds - passing_2pt_conversions + 10*passing_interceptions + 2*sacks_suffered + carries - 0.25*rushing_yards -2*rushing_tds - rushing_2pt_conversions + targets - receptions - 0.05*receiving_yards - 2*receiving_tds - receiving_2pt_conversions + 5*fumbles_total +10*fumbles_lost_total + fg_missed + 10*fg_missed_0_19 + 10*fg_missed_20_29 + 10*fg_missed_30_39 + 10*fg_missed_40_49 + 5*fg_missed_50_59 + 3*fg_missed_60_ + 5*pat_missed -6*pt_return_tds + loss + 25*pt_blocked) %>% 
+  arrange(desc(evil_pts))
+```
+
+Best Evil Seasons Last Year
+
+QBs
+
+```{r evil25qb_season}
+evil25qb_season <- data25_full %>% 
+  filter(position == "QB") %>% 
+  group_by(player_display_name, season) %>% 
+  summarise(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds) + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+RBs
+
+```{r evil25rb_season}
+evil25rb_season <- data25_full %>% 
+  filter(position == "RB") %>% 
+  group_by(player_display_name, season) %>% 
+  summarise(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds) + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+WRs
+
+```{r evil25wr_season}
+evil25wr_season <- data25_full %>% 
+  filter(position == "WR") %>% 
+  group_by(player_display_name, season) %>% 
+  summarise(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds) + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+Tight Ends
+
+```{r evil25te_season}
+evil25te_season <- data25_full %>% 
+  filter(position == "TE") %>% 
+  group_by(player_display_name, season) %>% 
+  summarise(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds) + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+Kickers
+
+```{r evil25k_season}
+evil25k_season <- data25_full %>% 
+  filter(position == "K") %>% 
+  group_by(player_display_name, season) %>% 
+  summarise(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds) + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+Punters
+
+```{r evilp25_season}
+evil25p_season <- data25_full %>% 
+  filter(position == "P") %>% 
+  group_by(player_display_name, season) %>% 
+  summarise(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds) + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+Evil Fantasy All Years
+
+NFL Stats for As Many Years as We can Get
+
+```{r data_all_years}
+data_all <- nflreadr::load_player_stats(seasons = 1999:2025)
+
+wins_losses <- nflreadr::load_schedules(seasons = 1999:2025) %>% 
+  select(game_id, home_team, result) %>% 
+  mutate(winloss = ifelse(result < 0, 1, 0))
+
+data_full <- left_join(data_all, wins_losses, by = "game_id") %>%
+  mutate(loss = ifelse((team == home_team & result < 0) | (team != home_team & result > 0), 1, 0)) 
+
+
+```
+
+Now Lets Get the Evil Points
+
+Let's find the Best Evil GAMES
+
+```{r evil_games}
+data_all_evil <- data_full %>% 
+  filter(position %in% c("QB", "RB", "WR", "TE", "K", "P")) %>% 
+  group_by(player_display_name, week, season) %>% 
+  reframe(evil_pts = 1*(attempts - completions) - 0.04*passing_yards - 4*passing_tds - passing_2pt_conversions + 10*passing_interceptions + 2*sacks_suffered + carries - 0.25*rushing_yards -2*rushing_tds - rushing_2pt_conversions + targets - receptions - 0.05*receiving_yards - 2*receiving_tds - receiving_2pt_conversions + 5*fumbles_total +10*fumbles_lost_total + fg_missed + 10*fg_missed_0_19 + 10*fg_missed_20_29 + 10*fg_missed_30_39 + 10*fg_missed_40_49 + 5*fg_missed_50_59 + 3*fg_missed_60_ + 5*pat_missed -6*pt_return_tds + loss + 25*pt_blocked) %>% 
+  arrange(desc(evil_pts))
+
+```
+
+Lets find the best evil SEASONS
+
+```{r evil_seasons}
+evil_season <- data_full %>% 
+  filter(position %in% c("QB", "RB", "WR", "TE", "K")) %>% 
+  group_by(player_display_name, season) %>% 
+  reframe(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds) + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+Let's find the Worst Evil GAMES
+
+```{r evil_games}
+data_all_evil_worst <- data_full %>% 
+  filter(position %in% c("QB", "RB", "WR", "TE", "K", "P")) %>% 
+  group_by(player_display_name, week, season) %>% 
+  reframe(evil_pts = 1*(attempts - completions) - 0.04*passing_yards - 4*passing_tds - passing_2pt_conversions + 10*passing_interceptions + 2*sacks_suffered + carries - 0.25*rushing_yards -2*rushing_tds - rushing_2pt_conversions + targets - receptions - 0.05*receiving_yards - 2*receiving_tds - receiving_2pt_conversions + 5*fumbles_total +10*fumbles_lost_total + fg_missed + 10*fg_missed_0_19 + 10*fg_missed_20_29 + 10*fg_missed_30_39 + 10*fg_missed_40_49 + 5*fg_missed_50_59 + 3*fg_missed_60_ + 5*pat_missed -6*pt_return_tds + loss + 25*pt_blocked) %>% 
+  arrange(evil_pts)
+```
+
+Lets find the Worst evil SEASONS
+
+```{r evil_seasons}
+evil_season_worst <- data_full %>% 
+  filter(position %in% c("QB", "RB", "WR", "TE", "K")) %>% 
+  group_by(player_display_name, season) %>% 
+  reframe(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds) + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(evil_pts)
+```
+
+This is all QBs, Lets look at other positions:
+
+Evil Running Backs: Single Game (since 1999)
+
+```{r evil_rb_single_game}
+evilrb_singlegame <- data_full %>% 
+  filter(position == "RB") %>% 
+  group_by(player_display_name, season, week) %>% 
+  reframe(evil_pts = 1*(attempts - completions) - 0.04*passing_yards - 4*passing_tds - passing_2pt_conversions + 10*passing_interceptions + 2*sacks_suffered + carries - 0.25*rushing_yards -2*rushing_tds - rushing_2pt_conversions + targets - receptions - 0.05*receiving_yards - 2*receiving_tds - receiving_2pt_conversions + 5*fumbles_total +10*fumbles_lost_total + fg_missed + 10*fg_missed_0_19 + 10*fg_missed_20_29 + 10*fg_missed_30_39 + 10*fg_missed_40_49 + 5*fg_missed_50_59 + 3*fg_missed_60_ + 5*pat_missed -6*pt_return_tds + sum(loss) + 25*sum(pt_blocked)) %>%
+  arrange(desc(evil_pts))
+```
+
+Evil Running Backs Single Season (Since 1999)
+
+```{r evilrb_single_season}
+evilrb_single_season <- data_full %>% 
+  filter(position == "RB") %>% 
+  group_by(player_display_name, season) %>% 
+  reframe(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds)  + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+Evil Wide Receivers: Single Game (since 1999)
+
+```{r evil_wr_single_game}
+evilwr_singlegame <- data_full %>% 
+  filter(position == "WR") %>% 
+  group_by(player_display_name, week, season) %>% 
+  reframe(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds)  + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+Evil Wide Receivers Single Season (Since 1999)
+
+```{r evilwr_single_season}
+evilwr_single_season <- data_full %>% 
+  filter(position == "WR") %>% 
+  group_by(player_display_name, season) %>% 
+  reframe(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds)  + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+Evil Tight Ends: Single Game (since 1999)
+
+```{r evil_te_single_game}
+evilte_singlegame <- data_full %>% 
+  filter(position == "TE") %>% 
+  group_by(player_display_name, week, season) %>% 
+  reframe(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds)  + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+Evil Tight Ends: Single Season (Since 1999)
+
+```{r evilte_single_season}
+evilte_single_season <- data_full %>% 
+  filter(position == "TE") %>% 
+  group_by(player_display_name, season) %>% 
+  reframe(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds)  + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+Evil Kicker: Single Game (since 1999)
+
+```{r evil_k_single_game}
+evilk_singlegame <- data_full %>% 
+  filter(position == "K") %>% 
+  group_by(player_display_name, week, season) %>% 
+  reframe(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds)  + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+Evil Kicker Single Season (Since 1999)
+
+```{r evilrb_single_season}
+evilk_single_season <- data_full %>% 
+  filter(position == "K") %>% 
+  group_by(player_display_name, season) %>% 
+  reframe(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds)  + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+Evil Punter: Single Game (since 1999)
+
+```{r evil_k_single_game}
+evilp_singlegame <- data_full %>% 
+  filter(position == "P") %>% 
+  group_by(player_display_name, week, season) %>% 
+  reframe(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds)  + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+Evil Punter Single Season (Since 1999)
+
+```{r evilrb_single_season}
+evilp_single_season <- data_full %>% 
+  filter(position == "P") %>% 
+  group_by(player_display_name, season) %>% 
+  reframe(evil_pts = 1*(sum(attempts) - sum(completions)) - 0.04*sum(passing_yards) - 4*sum(passing_tds) - sum(passing_2pt_conversions) + 10*sum(passing_interceptions) + 2*sum(sacks_suffered) + sum(carries) - 0.25*sum(rushing_yards) -2*sum(rushing_tds) - sum(rushing_2pt_conversions) + sum(targets) - sum(receptions) - 0.05*sum(receiving_yards) - 2*sum(receiving_tds) - sum(receiving_2pt_conversions) + 5*sum(fumbles_total) +10*sum(fumbles_lost_total) + sum(fg_missed) + 10*sum(fg_missed_0_19) + 10*sum(fg_missed_20_29) + 10*sum(fg_missed_30_39) + 10*sum(fg_missed_40_49) + 5*sum(fg_missed_50_59) + 3*sum(fg_missed_60_) + 5*sum(pat_missed) -6*sum(pt_return_tds)  + sum(loss) + 25*sum(pt_blocked)) %>% 
+  arrange(desc(evil_pts))
+```
+
+FINALLY, Evil Points Per Game
+
+```{r evil_ppg}
+evil_ppg <- data_all_evil %>%
+  group_by(player_display_name) %>%
+  summarise(games_played = n(), 
+            evil_ppg = mean(evil_pts)) %>%
+  arrange(desc(evil_ppg)) %>%
+  filter(games_played >= 32)
+  
+  
+```
